@@ -1,24 +1,160 @@
 <!DOCTYPE html>
-<html>
-  <head><title>NodeMCU Wi‑Fi Info</title></head>
-  <body>
-    <h2>Latest Scan</h2>
-    <pre id="output">Loading…</pre>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NodeMCU Wi‑Fi Scanner</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --clr-bg: #f0f2f5;
+      --clr-card: #ffffff;
+      --clr-text: #222;
+      --clr-accent: #4a90e2;
+      --clr-muted: #555;
+      --radius: 12px;
+      --gap: 1rem;
+      --transition: 0.3s ease;
+    }
+    [data-theme="dark"] {
+      --clr-bg: #181a1f;
+      --clr-card: #242731;
+      --clr-text: #e0e0e0;
+      --clr-accent: #5a9cff;
+      --clr-muted: #aaa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: var(--clr-bg);
+      color: var(--clr-text);
+      line-height: 1.6;
+      padding: var(--gap);
+      transition: background var(--transition), color var(--transition);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--gap);
+    }
+    header h1 {
+      font-weight: 600;
+      font-size: 1.8rem;
+      color: var(--clr-accent);
+    }
+    .toggle-btn {
+      background: none;
+      border: 2px solid var(--clr-accent);
+      padding: 0.3rem 0.6rem;
+      border-radius: var(--radius);
+      cursor: pointer;
+      color: var(--clr-accent);
+      font-weight: 600;
+      transition: background var(--transition), color var(--transition);
+    }
+    .toggle-btn:hover {
+      background: var(--clr-accent);
+      color: var(--clr-card);
+    }
+    #status {
+      text-align: center;
+      margin-bottom: var(--gap);
+      font-size: 1.1rem;
+      color: var(--clr-muted);
+      transition: color var(--transition);
+    }
+    #networks {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--gap);
+    }
+    .card {
+      background: var(--clr-card);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      padding: var(--gap);
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      word-break: break-all;
+    }
+    .card p {
+      font-size: 0.85rem;
+      margin: 0.2rem 0;
+      color: var(--clr-muted);
+      word-break: break-all;
+    }
+    .card span {
+      font-weight: 500;
+      color: var(--clr-text);
+    }
+    @media (max-width: 480px) {
+      header h1 { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body data-theme="light">
+  <header>
+    <h1>🔍 Wi‑Fi Scanner</h1>
+    <button class="toggle-btn" id="themeToggle">Dark Mode</button>
+  </header>
+  <div id="status">Loading latest scan…</div>
+  <div id="networks"></div>
 
-    <script>
-      const channelId = 2991004;  // e.g. 2270321
-      fetch(
-        `https://api.thingspeak.com/channels/${channelId}/feeds.json?results=1`
-      )
-        .then(r => r.json())
-        .then(js => {
-          const f = js.feeds[0];
-          document.getElementById("output").innerText =
-            `IP       : ${f.field1}\n` +
-            `SSIDs    : ${f.field2}\n` +
-            `RSSIs    : ${f.field3}\n` +
-            `Encrypt  : ${f.field4}`;
+  <script>
+    const channelId = 2991004;  // your ThingSpeak channel ID
+    const statusEl = document.getElementById('status');
+    const netContainer = document.getElementById('networks');
+
+    // Theme toggle
+    const btn = document.getElementById('themeToggle');
+    btn.addEventListener('click', () => {
+      const theme = document.body.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      document.body.setAttribute('data-theme', theme);
+      btn.textContent = theme === 'light' ? 'Dark Mode' : 'Light Mode';
+    });
+
+    fetch(`https://api.thingspeak.com/channels/${channelId}/feeds.json?results=1`)
+      .then(res => res.json())
+      .then(js => {
+        const f = js.feeds[0];
+        statusEl.innerHTML = `<strong>IP Address:</strong> ${f.field1}`;
+        const fields = {
+          ssid: f.field2?.split(',') || [],
+          rssi: f.field3?.split(',') || [],
+          enc:  f.field4?.split(',') || [],
+          bssid:f.field5?.split(',') || [],
+          ch:   f.field6?.split(',') || [],
+          hid:  f.field7?.split(',') || []
+        };
+        netContainer.innerHTML = '';
+        fields.ssid.forEach((ssid, i) => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <h2>${ssid || '<i>Hidden SSID</i>'}</h2>
+            <p><span>RSSI:</span> ${fields.rssi[i] || '—'}</p>
+            <p><span>Encryption:</span> ${['Open','WEP','WPA','WPA2','WPA/WPA2'][fields.enc[i]] || '—'}</p>
+            <p><span>BSSID:</span> ${fields.bssid[i] || '—'}</p>
+            <p><span>Channel:</span> ${fields.ch[i] || '—'}</p>
+            <p><span>Hidden:</span> ${fields.hid[i] === '1' ? 'Yes' : 'No'}</p>
+          `;
+          netContainer.appendChild(card);
         });
-    </script>
-  </body>
+      })
+      .catch(err => {
+        statusEl.textContent = 'Error loading data.';
+        console.error(err);
+      });
+  </script>
+</body>
 </html>
