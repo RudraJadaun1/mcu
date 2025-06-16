@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Secure Wi‑Fi Scanner Login</title>
-  <!-- Google Font -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NodeMCU Wi‑Fi Scanner</title>
+  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -15,7 +15,7 @@
       --clr-muted: #555;
       --radius: 12px;
       --gap: 1rem;
-      --trans: 0.3s ease;
+      --transition: 0.3s ease;
     }
     [data-theme="dark"] {
       --clr-bg: #181a1f;
@@ -29,59 +29,22 @@
       font-family: 'Poppins', sans-serif;
       background: var(--clr-bg);
       color: var(--clr-text);
+      line-height: 1.6;
+      padding: var(--gap);
+      transition: background var(--transition), color var(--transition);
+    }
+    header {
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      justify-content: center;
-      height: 100vh;
-      transition: background var(--trans), color var(--trans);
-    }
-    #login-container {
-      background: var(--clr-card);
-      padding: 2rem;
-      border-radius: var(--radius);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      width: 320px;
-    }
-    #login-container h2 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--clr-accent);
-      text-align: center;
       margin-bottom: var(--gap);
     }
-    input {
-      width: 100%;
-      padding: 0.7rem;
-      margin-bottom: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 1rem;
-    }
-    button {
-      width: 100%;
-      padding: 0.8rem;
-      background: var(--clr-accent);
-      color: var(--clr-card);
-      border: none;
-      border-radius: var(--radius);
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background var(--trans);
-    }
-    button:hover {
-      background: darken(var(--clr-accent), 10%);
-    }
-    #error {
-      color: #e74c3c;
-      font-size: 0.9rem;
-      text-align: center;
-      margin-bottom: 1rem;
-      display: none;
+    header h1 {
+      font-weight: 600;
+      font-size: 1.8rem;
+      color: var(--clr-accent);
     }
     .toggle-btn {
-      position: absolute;
-      top: var(--gap);
-      right: var(--gap);
       background: none;
       border: 2px solid var(--clr-accent);
       padding: 0.3rem 0.6rem;
@@ -89,59 +52,109 @@
       cursor: pointer;
       color: var(--clr-accent);
       font-weight: 600;
-      transition: var(--trans);
+      transition: background var(--transition), color var(--transition);
     }
     .toggle-btn:hover {
       background: var(--clr-accent);
       color: var(--clr-card);
     }
+    #status {
+      text-align: center;
+      margin-bottom: var(--gap);
+      font-size: 1.1rem;
+      color: var(--clr-muted);
+      transition: color var(--transition);
+    }
+    #networks {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--gap);
+    }
+    .card {
+      background: var(--clr-card);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      padding: var(--gap);
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      word-break: break-all;
+    }
+    .card p {
+      font-size: 0.85rem;
+      margin: 0.2rem 0;
+      color: var(--clr-muted);
+      word-break: break-all;
+    }
+    .card span {
+      font-weight: 500;
+      color: var(--clr-text);
+    }
+    @media (max-width: 480px) {
+      header h1 { font-size: 1.4rem; }
+    }
   </style>
 </head>
 <body data-theme="light">
-  <button class="toggle-btn" id="themeToggle">Dark Mode</button>
-  <div id="login-container">
-    <h2>Login</h2>
-    <div id="error">Invalid credentials</div>
-    <input id="username" type="text" placeholder="Username" autofocus>
-    <input id="password" type="password" placeholder="Password">
-    <button id="login">Sign In</button>
-  </div>
+  <header>
+    <h1>🔍 Wi‑Fi Scanner</h1>
+    <button class="toggle-btn" id="themeToggle">Dark Mode</button>
+  </header>
+  <div id="status">Loading latest scan…</div>
+  <div id="networks"></div>
 
   <script>
-    // Theme toggle logic
-    const toggle = document.getElementById('themeToggle');
-    toggle.addEventListener('click', () => {
+    const channelId = 2991004;  // your ThingSpeak channel ID
+    const statusEl = document.getElementById('status');
+    const netContainer = document.getElementById('networks');
+
+    // Theme toggle
+    const btn = document.getElementById('themeToggle');
+    btn.addEventListener('click', () => {
       const theme = document.body.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
       document.body.setAttribute('data-theme', theme);
-      toggle.textContent = theme === 'light' ? 'Dark Mode' : 'Light Mode';
+      btn.textContent = theme === 'light' ? 'Dark Mode' : 'Light Mode';
     });
 
-    // Symbol map for encoding
-    const symbolMap = {
-      'a':'@','A':'@','b':'8','B':'8','c':'(', 'C':'(',
-      'e':'3','E':'3','g':'9','G':'9','h':'#','H':'#',
-      'i':'!','I':'!','j':']','J':']','o':'0','O':'0',
-      's':'$','S':'$','t':'7','T':'7','u':'^','U':'^',
-      'n':'~','N':'~','_':'%'
-    };
-    // Encoded 'Just_a_human'
-    const storedEncoded = "]^$7%@%#^m@~";
-    const validUser = 'JRados';
-
-    function encodePassword(pwd) {
-      return pwd.split('').map(ch => symbolMap[ch] || ch).join('');
-    }
-
-    document.getElementById('login').addEventListener('click', () => {
-      const user = document.getElementById('username').value;
-      const pwd  = document.getElementById('password').value;
-      const errEl = document.getElementById('error');
-      if (user === validUser && encodePassword(pwd) === storedEncoded) {
-        window.location.href = 'index.html';
-      } else {
-        errEl.style.display = 'block';
-      }
-    });
+    fetch(`https://api.thingspeak.com/channels/${channelId}/feeds.json?results=1`)
+      .then(res => res.json())
+      .then(js => {
+        const f = js.feeds[0];
+        statusEl.innerHTML = `<strong>IP Address:</strong> ${f.field1}`;
+        const fields = {
+          ssid: f.field2?.split(',') || [],
+          rssi: f.field3?.split(',') || [],
+          enc:  f.field4?.split(',') || [],
+          bssid:f.field5?.split(',') || [],
+          ch:   f.field6?.split(',') || [],
+          hid:  f.field7?.split(',') || []
+        };
+        netContainer.innerHTML = '';
+        fields.ssid.forEach((ssid, i) => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <h2>${ssid || '<i>Hidden SSID</i>'}</h2>
+            <p><span>RSSI:</span> ${fields.rssi[i] || '—'}</p>
+            <p><span>Encryption:</span> ${['Open','WEP','WPA','WPA2','WPA/WPA2'][fields.enc[i]] || '—'}</p>
+            <p><span>BSSID:</span> ${fields.bssid[i] || '—'}</p>
+            <p><span>Channel:</span> ${fields.ch[i] || '—'}</p>
+            <p><span>Hidden:</span> ${fields.hid[i] === '1' ? 'Yes' : 'No'}</p>
+          `;
+          netContainer.appendChild(card);
+        });
+      })
+      .catch(err => {
+        statusEl.textContent = 'Error loading data.';
+        console.error(err);
+      });
   </script>
 </body>
 </html>
