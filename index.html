@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head><title>NodeMCU Wi‑Fi Info</title></head>
+  <body>
+    <h2>Latest Scan</h2>
+    <pre id="output">Loading…</pre>
+
+    <script>
+      const channelId = 2991004;  // e.g. 2270321
+      fetch(
+        `https://api.thingspeak.com/channels/${channelId}/feeds.json?results=1`
+      )
+        .then(r => r.json())
+        .then(js => {
+          const f = js.feeds[0];
+          document.getElementById("output").innerText =
+            `IP       : ${f.field1}\n` +
+            `SSIDs    : ${f.field2}\n` +
+            `RSSIs    : ${f.field3}\n` +
+            `Encrypt  : ${f.field4}`;
+        });
+    </script>
+  </body>
+</html>
